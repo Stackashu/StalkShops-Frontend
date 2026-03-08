@@ -47,7 +47,7 @@ const MainPage = () => {
     }, []);
 
     return (
-        <div className="flex items-center justify-center min-h-full mainBgColor">
+        <div className="flex items-center justify-center min-h-screen mainBgColor">
             <div 
                 ref={containerRef}
                 className="bg-white rounded-[40px] w-full max-w-2xl h-20 flex items-center justify-center shadow-2xl overflow-hidden"
