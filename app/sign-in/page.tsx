@@ -41,9 +41,11 @@ const SignInPage = () => {
                     </div>
 
                     {/* Submit Button */}
-                    <button className="mainBgColor text-white font-semibold py-4 rounded-full text-base w-full mt-2 hover:opacity-90 transition-opacity">
-                        Submit
-                    </button>
+                    <Link href="/home">
+                        <button className="mainBgColor text-white font-semibold py-4 rounded-full text-base w-full mt-2 hover:opacity-90 transition-opacity">
+                            Submit
+                        </button>
+                    </Link>
 
                     {/* OR Divider */}
                     <div className="flex items-center gap-3">
