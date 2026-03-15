@@ -4,18 +4,22 @@ import { MapPin, LayoutList, ShoppingBag, Headset } from 'lucide-react';
 
 interface BottomNavProps {
     onOpenLocationSelect: () => void;
+    pins?: number;
 }
 
-export default function BottomNav({ onOpenLocationSelect }: BottomNavProps) {
+export default function BottomNav({ onOpenLocationSelect, pins = 0 }: BottomNavProps) {
     return (
         <div className="relative">
             {/* Floating Action Button for Location */}
             <div className="absolute bottom-20 right-4">
                 <button
                     onClick={onOpenLocationSelect}
-                    className="w-14 h-14 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:scale-105 transition-transform"
+                    className="w-14 h-14 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:scale-105 transition-transform relative"
                 >
-                    <MapPin className="w-6 h-6 text-gray-400" />
+                    <MapPin className="w-6 h-6 text-red-500" />
+                    <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center border-2 border-white shadow-sm">
+                        {pins}
+                    </div>
                 </button>
             </div>
 
@@ -27,7 +31,7 @@ export default function BottomNav({ onOpenLocationSelect }: BottomNavProps) {
                 </button>
                 <button className="flex flex-col items-center gap-1 p-2 flex-1">
                     <ShoppingBag className="w-6 h-6 text-black" />
-                    <span className="text-xs font-semibold">Orders</span>
+                    <span className="text-xs font-semibold"> Pinned Orders</span>
                 </button>
                 <button className="flex flex-col items-center gap-1 p-2 flex-1">
                     <Headset className="w-6 h-6 text-black" />

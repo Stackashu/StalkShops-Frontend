@@ -1,6 +1,5 @@
-'use client';
-
-import { LogOut } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 interface SidebarMenuProps {
     isOpen: boolean;
@@ -8,9 +7,23 @@ interface SidebarMenuProps {
 }
 
 export default function SidebarMenu({ isOpen, onClose }: SidebarMenuProps) {
+    const [role, setRole] = useState('User');
+
+    useEffect(() => {
+        const savedRole = localStorage.getItem('role')?.toLowerCase() || 'User';
+        setRole(savedRole);
+    }, [isOpen]);
+
+    const MENU_ITEMS = [
+        { name: 'Profile', path: `/${role}/profile` },
+        { name: 'Change Password', path: `/${role}/change-password` },
+        { name: 'Settings', path: `/${role}/settings` },
+        { name: 'Subscriptions', path: `/${role}/manage-subscriptions` },
+        { name: 'Orders', path: `/${role}/orders` },
+    ];
     return (
         <>
-            {/* Backdrop */}
+            {/* ... backdrop ... */}
             {isOpen && (
                 <div
                     className="fixed inset-0 z-40 bg-black/20 transition-opacity"
@@ -24,20 +37,27 @@ export default function SidebarMenu({ isOpen, onClose }: SidebarMenuProps) {
                     }`}
             >
                 <div className="p-6">
-                    <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mb-8">
+                    <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mb-8 shadow-xl shadow-red-100">
                         <span className="text-white font-bold text-2xl">SS</span>
                     </div>
 
                     <nav className="flex flex-col">
-                        {['Profile', 'Change Password', 'Settings', 'Manage Subscriptions', 'Orders', 'Privacy Policy'].map((item, index) => (
-                            <button
+                        {MENU_ITEMS.map((item, index) => (
+                            <Link
                                 key={index}
-                                className="text-left py-4 border-b border-gray-100 text-lg font-medium text-gray-600 hover:text-black transition-colors"
+                                href={item.path}
+                                className="text-left py-4 border-b border-gray-50 text-lg font-bold text-gray-800 hover:text-red-600 transition-colors"
                                 onClick={onClose}
                             >
-                                {item}
-                            </button>
+                                {item.name}
+                            </Link>
                         ))}
+                        <button
+                            className="text-left py-4 border-b border-gray-50 text-lg font-bold text-gray-400"
+                            onClick={onClose}
+                        >
+                            Privacy Policy
+                        </button>
                     </nav>
                 </div>
 

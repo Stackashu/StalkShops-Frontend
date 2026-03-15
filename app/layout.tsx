@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Bitter } from "next/font/google";
 import "./globals.css";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const bitter = Bitter({
   variable: "--font-bitter",
@@ -27,6 +29,7 @@ export default function RootLayout({
         style={{ fontFamily: "var(--font-bitter), serif" }}
       >
         {children}
+        <ToastContainer position="top-right" autoClose={5000} />
       </body>
     </html>
   );

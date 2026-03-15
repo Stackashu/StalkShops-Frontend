@@ -1,13 +1,13 @@
-'use client';
-
-import { User, LogIn } from 'lucide-react';
+import { User, LogOut } from 'lucide-react';
+import React from 'react';
 
 interface TopBarProps {
     onOpenSidebar: () => void;
     onOpenSearch: () => void;
+    onLogout: () => void;
 }
 
-export default function TopBar({ onOpenSidebar, onOpenSearch }: TopBarProps) {
+export default function TopBar({ onOpenSidebar, onOpenSearch, onLogout }: TopBarProps) {
     return (
         <div className="flex items-center gap-3 w-full">
             {/* Profile Icon */}
@@ -26,9 +26,12 @@ export default function TopBar({ onOpenSidebar, onOpenSearch }: TopBarProps) {
                 <span className="text-sm">Search Samosa , chai ....</span>
             </button>
 
-            {/* Login/Action Icon (top right) */}
-            <button className="shrink-0 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
-                <LogIn className="w-6 h-6 text-gray-400" />
+            {/* Logout Icon (top right) */}
+            <button 
+                onClick={onLogout}
+                className="shrink-0 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+            >
+                <LogOut className="w-6 h-6 text-red-400" />
             </button>
         </div>
     );

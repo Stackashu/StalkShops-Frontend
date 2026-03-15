@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import VendorHome from '../Vendor/VendorHome';
-import UserHome from '../User/UserHome';
-// import VendorHome from '../Vendor/VendorHome';
-// import UserHome from '../User/UserHome';
+import VendorHome from '../vendor/VendorHome';
+import UserHome from '../user/UserHome';
+// import VendorHome from '../vendor/VendorHome';
+// import UserHome from '../user/UserHome';
 
 export default function Home() {
     const [role, setRole] = useState<string | null>(null);
@@ -15,7 +15,7 @@ export default function Home() {
         const savedRole = localStorage.getItem('role') || 'User';
         setRole(savedRole);
     }, []);
-     
+
     console.log("renderd");
     if (!mounted) return null;
 
