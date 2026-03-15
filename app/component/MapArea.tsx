@@ -1,10 +1,10 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 
 // Leaflet types can be imported safely as they are erased at runtime
-import type { Map as LeafletMap, DivIcon } from 'leaflet';
+import type { Map as LeafletMap } from 'leaflet';
 import { MapPin, LocateFixed } from 'lucide-react';
 
 const MapContainer = dynamic(
@@ -22,8 +22,8 @@ const Marker = dynamic(
 
 // Sample markers data
 const VENDORS = [
-    { id: 1, name: 'Chai Wala', lat: 28.6139, lng: 77.2090, iconUrl: '/icons/truck.png' },
-    { id: 2, name: 'Vegetables', lat: 28.6239, lng: 77.2190, iconUrl: '/icons/truck.png' },
+    { id: 1, name: 'Chai Wala', lat: 28.6139, lng: 77.2090, iconUrl: './Thela1.png' },
+    { id: 2, name: 'Vegetables', lat: 28.6239, lng: 77.2190, iconUrl: './Thela1.png' },
 ];
 
 export interface MapAreaProps {
@@ -31,33 +31,57 @@ export interface MapAreaProps {
     onConfirmLocation?: (lat: number, lng: number) => void;
     onCancelPicking?: () => void;
     searchedLocation?: { lat: number, lng: number } | null;
+    ref?: React.Ref<MapAreaHandle>;
 }
 
-export default function MapArea({ isPickingLocation = false, onConfirmLocation, onCancelPicking, searchedLocation }: MapAreaProps) {
+export interface MapAreaHandle {
+    handleLocateMe: () => void;
+}
+
+const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = false, onConfirmLocation, onCancelPicking, searchedLocation }, ref) => {
     const [mounted, setMounted] = useState(false);
     const [position, setPosition] = useState<[number, number]>([28.6139, 77.2090]);
+    const [hasCentered, setHasCentered] = useState(false);
     // Used to track where the map is currently centered while dragging
     const [currentCenter, setCurrentCenter] = useState<[number, number] | null>(null);
     const [mapInstance, setMapInstance] = useState<LeafletMap | null>(null);
 
+    const handleLocateMe = () => {
+        if (mapInstance && position) {
+            mapInstance.flyTo(position, 15, { animate: true });
+        } else if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const newPos: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+                setPosition(newPos);
+                mapInstance?.flyTo(newPos, 15);
+            });
+        }
+    };
+
+    useImperativeHandle(ref, () => ({
+        handleLocateMe
+    }));
+
     useEffect(() => {
         setMounted(true);
-        if (navigator.geolocation) {
+        if (navigator.geolocation && !hasCentered) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
-                    setPosition([pos.coords.latitude, pos.coords.longitude]);
+                    const newPos: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+                    setPosition(newPos);
+                    if (mapInstance && !hasCentered) {
+                        mapInstance.setView(newPos, 14);
+                        setHasCentered(true);
+                    }
                 },
-                (err) => {
-                    console.error("Error getting location:", err);
-                }
+                (err) => console.log("Map initial position fallback:", err)
             );
         }
-    }, [isPickingLocation]); // Re-prompt/update if they enter picking mode
+    }, [mapInstance, hasCentered]);
 
     // Fly to searched location when it changes
     useEffect(() => {
         if (searchedLocation && mapInstance) {
-            setPosition([searchedLocation.lat, searchedLocation.lng]);
             mapInstance.flyTo([searchedLocation.lat, searchedLocation.lng], 15, { animate: true });
         }
     }, [searchedLocation, mapInstance]);
@@ -67,47 +91,36 @@ export default function MapArea({ isPickingLocation = false, onConfirmLocation, 
     }
 
     const createCustomIcon = (name: string, iconUrl?: string) => {
-        // Safe to require L here because this function only runs when mounted on client,
-        // and react-leaflet has already been loaded.
         const L = require('leaflet');
-
-        // Generate HTML for the custom divIcon matching the design
         const htmlString = `
       <div class="flex flex-col items-center justify-center -mt-6">
-        <div class="bg-white px-3 py-1 rounded-full shadow-md text-xs font-bold text-gray-800 border border-gray-100 mb-1 whitespace-nowrap">
+        <div class="bg-white px-3 py-1 rounded-full shadow-md text-[10px]  text-gray-800 border border-gray-100 mb-1 whitespace-nowrap uppercase tracking-tighter">
           ${name}
         </div>
-        <div class="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center shadow-lg text-white">
-          <svg xmlns="http://www.svg.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>
+        <div class="w-10 h-10 rounded-full  overflow-hidden  flex items-center justify-center">
+          ${iconUrl 
+            ? `<img src="${iconUrl}" class="w-full h-full object-cover" />`
+            : `<div class="w-full h-full bg-red-50 flex items-center justify-center  font-bold text-xs">SS</div>`
+          }
         </div>
-      </div>
+      </div>    
     `;
 
         return L.divIcon({
             html: htmlString,
-            className: '', // important to clear default leaflet styles
+            className: '', 
             iconSize: [60, 60],
             iconAnchor: [30, 30],
         });
     };
 
-    // Custom component to update map center dynamically and track center during drag
-    const MapCenterHandler = ({ initialLat, initialLng }: { initialLat: number; initialLng: number }) => {
-        // react-leaflet exposes useMap and useMapEvents hook
-        const { useMap, useMapEvents } = require('react-leaflet');
-        const map = useMap();
-
-        useEffect(() => {
-            if (!map) return;
-            // Only force set view if we aren't picking, otherwise let user drag freely
-            if (!isPickingLocation) {
-                map.setView([initialLat, initialLng], map.getZoom(), { animate: false });
-            }
-        }, [initialLat, initialLng, map, isPickingLocation]);
-
+    // Custom component to track center during drag
+    const MapEventsHandler = () => {
+        const { useMapEvents } = require('react-leaflet');
+        
         useMapEvents({
-            moveend: () => {
-                if (!map) return;
+            moveend: (e: any) => {
+                const map = e.target;
                 const center = map.getCenter();
                 setCurrentCenter([center.lat, center.lng]);
             }
@@ -119,7 +132,6 @@ export default function MapArea({ isPickingLocation = false, onConfirmLocation, 
     return (
         <div className="relative h-full w-full">
             <MapContainer
-                key={`map-${isPickingLocation ? 'picking' : 'viewing'}`}
                 center={position}
                 zoom={14}
                 scrollWheelZoom={true}
@@ -127,13 +139,12 @@ export default function MapArea({ isPickingLocation = false, onConfirmLocation, 
                 zoomControl={false}
                 ref={setMapInstance}
             >
-                <MapCenterHandler initialLat={position[0]} initialLng={position[1]} />
+                <MapEventsHandler />
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                 />
 
-                {/* Marker for User's Current Location */}
                 {!isPickingLocation && (
                     <Marker
                         position={position}
@@ -141,12 +152,11 @@ export default function MapArea({ isPickingLocation = false, onConfirmLocation, 
                     />
                 )}
 
-                {/* Vendors */}
                 {!isPickingLocation && VENDORS.map(vendor => (
                     <Marker
                         key={vendor.id}
                         position={[vendor.lat, vendor.lng]}
-                        icon={createCustomIcon(vendor.name)}
+                        icon={createCustomIcon(vendor.name, vendor.iconUrl)}
                     />
                 ))}
             </MapContainer>
@@ -166,7 +176,7 @@ export default function MapArea({ isPickingLocation = false, onConfirmLocation, 
                         </button>
                     </div>
 
-                    {/* Center Pin Overlay (fixed to exact center point of the view) */}
+                    {/* Center Pin Overlay */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-50 pointer-events-none drop-shadow-xl flex flex-col items-center">
                         <div className="bg-blue-600 text-white text-xs font-bold px-3 py-1 mb-1 rounded-full shadow-lg">
                             Pick Location
@@ -174,28 +184,24 @@ export default function MapArea({ isPickingLocation = false, onConfirmLocation, 
                         <MapPin className="w-10 h-10 text-red-500 fill-red-100/50 relative top-1" />
                     </div>
 
-                    {/* Locate Me Button Overlay (bottom right, above confirm button) */}
-                    <div className="absolute bottom-28 right-4 z-50 pointer-events-auto">
+                    {/* Locate Me Button Overlay - Styled to match "pin location" request */}
+                    <div className="absolute bottom-40 right-4 z-50 pointer-events-auto">
                         <button
-                            onClick={() => {
-                                if (mapInstance && position) {
-                                    mapInstance.flyTo(position, 15, { animate: true });
-                                }
-                            }}
-                            className="w-12 h-12 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+                            onClick={handleLocateMe}
+                            className="w-14 h-14 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+                            title="Locate Me"
                         >
-                            <LocateFixed className="w-6 h-6 text-gray-700" />
+                            <LocateFixed className="w-10 h-10 text-gray-700" />
                         </button>
                     </div>
 
-                    {/* Confirm Button Overlay at Bottom */}
+                    {/* Confirm Button Overlay */}
                     <div className="absolute bottom-8 left-0 w-full px-6 z-50 pointer-events-auto">
                         <button
                             onClick={() => {
                                 if (onConfirmLocation && currentCenter) {
                                     onConfirmLocation(currentCenter[0], currentCenter[1]);
                                 } else if (onConfirmLocation) {
-                                    // Fallback if they didn't drag at all
                                     onConfirmLocation(position[0], position[1]);
                                 }
                             }}
@@ -208,4 +214,7 @@ export default function MapArea({ isPickingLocation = false, onConfirmLocation, 
             )}
         </div>
     );
-}
+});
+
+MapArea.displayName = 'MapArea';
+export default MapArea;

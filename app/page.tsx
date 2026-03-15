@@ -4,11 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import MainPage from './MainPage';
 
-// ─────────────────────────────────────────────
-// 🔑 AUTH KEY — set to true once backend is ready
-const IS_LOGGED_IN = false;
-// ─────────────────────────────────────────────
-
 export default function Home() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -21,8 +16,15 @@ export default function Home() {
     if (!mounted) return;
 
     const timer = setTimeout(() => {
-      if (IS_LOGGED_IN) {
-        router.replace('/home');
+      const token = localStorage.getItem('token');
+      const role = localStorage.getItem('role');
+
+      if (token) {
+        if (role === 'vendor') {
+          router.replace('/vendor');
+        } else {
+          router.replace('/home');
+        }
       } else {
         router.replace('/sign-in');
       }
