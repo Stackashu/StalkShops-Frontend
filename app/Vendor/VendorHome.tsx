@@ -1,6 +1,7 @@
+"use client"
 import LocationGuard from '../component/LocationGuard';
 
-export default function VendorHome() {
+export  const VendorHome = () => {
     return (
         <LocationGuard>
             <div className="flex items-center justify-center p-4 h-full bg-white text-black font-bitter">
