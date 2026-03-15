@@ -20,7 +20,7 @@ import { MapAreaHandle, MapAreaProps } from '../component/MapArea';
 
 
 
-export const UserHome = () => {
+export default function UserHome() {
     const router = useRouter();
     const mapRef = useRef<MapAreaHandle>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
