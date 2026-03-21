@@ -1,12 +1,13 @@
 'use client';
 
 // user id  pedehi2482@faxzu.com
-// password test1
+// password test1 updated to 0000
 import { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { LocateFixed } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { useSocket } from '../../hooks/useSocket';
 
 const MapArea = dynamic<MapAreaProps>(() => import('../component/MapArea'), { ssr: false });
 import TopBar from './TopBar';
@@ -32,23 +33,27 @@ export default function UserHome() {
     const [searchedLocation, setSearchedLocation] = useState<{ lat: number, lng: number } | null>(null);
     const [userData, setUserData] = useState<any>(null);
 
-    useEffect(() => {
-        const fetchProfile = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const role = localStorage.getItem('role') || 'User';
-                const endpoint = role === 'Vendor' ? '/api/vendor' : '/api/user';
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    setUserData(data.userFound || data.vendorFound);
-                }
-            } catch (err) {
-                console.error("Failed to fetch profile:", err);
+    // Socket.io integration
+    const socket = useSocket(userData?._id);
+
+    const fetchProfile = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const role = localStorage.getItem('role') || 'User';
+            const endpoint = role === 'Vendor' ? '/api/vendor' : '/api/user';
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setUserData(data.userFound || data.vendorFound);
             }
-        };
+        } catch (err) {
+            console.error("Failed to fetch profile:", err);
+        }
+    };
+
+    useEffect(() => {
         fetchProfile();
     }, []);
 
@@ -131,6 +136,10 @@ export default function UserHome() {
                         setIsPickingLocation(true);
                     }}
                     pickedLocation={pickedLocation}
+                    onPinSuccess={() => {
+                        mapRef.current?.refreshPins();
+                        fetchProfile();
+                    }}
                 />
 
                 {/* Logout Confirmation Dialog */}

@@ -10,6 +10,7 @@ interface LocationSelectProps {
     onSelectLocationMode: () => void;
     onSelectSearchedLocation: (lat: number, lng: number) => void;
     pickedLocation?: { lat: number; lng: number } | null;
+    onPinSuccess?: () => void;
 }
 
 interface PhotonFeature {
@@ -28,7 +29,7 @@ interface PhotonFeature {
     };
 }
 
-export default function LocationSelect({ isOpen, onClose, onSelectLocationMode, onSelectSearchedLocation, pickedLocation }: LocationSelectProps) {
+export default function LocationSelect({ isOpen, onClose, onSelectLocationMode, onSelectSearchedLocation, pickedLocation, onPinSuccess }: LocationSelectProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedType, setSelectedType] = useState<string>('');
@@ -274,12 +275,48 @@ export default function LocationSelect({ isOpen, onClose, onSelectLocationMode, 
 
                     {/* Submit Button */}
                     <button
-                        onClick={() => {
-                            console.log("Pinned:", selectedType, pinDuration, pickedLocation);
-                            setIsDialogOpen(false);
-                            onClose(); // Close entire location sheet
+                        onClick={async () => {
+                            try {
+                                const token = localStorage.getItem('token');
+                                const [hours, minutes] = pinDuration.split(':');
+                                const expiryAt = new Date();
+                                expiryAt.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+                                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify({
+                                        deliveryLocation: pickedLocationName,
+                                        lat: pickedLocation?.lat,
+                                        lng: pickedLocation?.lng,
+                                        deliveredBy: '65f0a0a0a0a0a0a0a0a0a0a0', // Placeholder or dynamic vendor ID
+                                        shopType: selectedType, // Using selectedType as shopType
+                                        item: selectedType, // Using selectedType as item for now
+                                        expiryTime: expiryAt.toISOString()
+                                    })
+                                });
+
+                                const data = await response.json();
+                                if (response.ok) {
+                                    const toast = (await import('react-toastify')).toast;
+                                    toast.success("Location pinned successfully!");
+                                    if (onPinSuccess) onPinSuccess();
+                                    setIsDialogOpen(false);
+                                    onClose();
+                                } else {
+                                    const toast = (await import('react-toastify')).toast;
+                                    toast.error(data.error || "Failed to pin location");
+                                }
+                            } catch (err) {
+                                console.error("Pinning error:", err);
+                                const toast = (await import('react-toastify')).toast;
+                                toast.error("Connection error");
+                            }
                         }}
-                        disabled={!selectedType || pinDuration.length !== 5 || !pinDuration.includes(':')}
+                        disabled={!selectedType || pinDuration.length < 4 || !pinDuration.includes(':')}
                         className="w-full bg-gray-900 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold mt-2 transition-colors"
                     >
                         Save Pin Location
