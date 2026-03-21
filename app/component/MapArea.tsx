@@ -5,7 +5,7 @@ import React, { useEffect, useState, useImperativeHandle, forwardRef } from 'rea
 
 // Leaflet types can be imported safely as they are erased at runtime
 import type { Map as LeafletMap } from 'leaflet';
-import { MapPin, LocateFixed } from 'lucide-react';
+import { MapPin, LocateFixed, Store, Calendar } from 'lucide-react';
 
 const MapContainer = dynamic(
     () => import('react-leaflet').then((mod) => mod.MapContainer),
@@ -19,12 +19,10 @@ const Marker = dynamic(
     () => import('react-leaflet').then((mod) => mod.Marker),
     { ssr: false }
 );
-
-// Sample markers data
-const VENDORS = [
-    { id: 1, name: 'Chai Wala', lat: 28.6139, lng: 77.2090, iconUrl: './Thela1.png' },
-    { id: 2, name: 'Vegetables', lat: 28.6239, lng: 77.2190, iconUrl: './Thela1.png' },
-];
+const Popup = dynamic(
+    () => import('react-leaflet').then((mod) => mod.Popup),
+    { ssr: false }
+);
 
 export interface MapAreaProps {
     isPickingLocation?: boolean;
@@ -36,7 +34,108 @@ export interface MapAreaProps {
 
 export interface MapAreaHandle {
     handleLocateMe: () => void;
+    refreshPins: () => void;
 }
+
+// Sub-component for individual Pin Markers to handle detail fetching
+const PinMarker = ({ pin }: { pin: any }) => {
+    const [details, setDetails] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+
+    const fetchDetails = async () => {
+        if (details) return; // Only fetch once
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/${pin.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) setDetails(data.pin);
+        } catch (err) {
+            console.error("Failed to fetch pin details:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const createCustomIcon = (name: string, iconUrl?: string, isUserPin?: boolean) => {
+        const L = require('leaflet');
+        const colorClass = isUserPin ? 'bg-blue-600 text-white' : 'bg-white text-gray-800';
+        
+        const htmlString = `
+      <div class="flex flex-col items-center justify-center -mt-6">
+        <div class="${colorClass} px-3 py-1 rounded-full shadow-md text-[10px] border border-gray-100 mb-1 whitespace-nowrap uppercase tracking-tighter font-bold">
+          ${name}
+        </div>
+        <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center shadow-lg border-2 border-white">
+          ${iconUrl 
+            ? `<img src="${iconUrl}" class="w-full h-full object-cover" />`
+            : `<div class="w-full h-full ${isUserPin ? 'bg-blue-600' : 'bg-red-500'} flex items-center justify-center shadow-inner">
+                <div class="w-3 h-3 bg-white rounded-full"></div>
+               </div>`
+          }
+        </div>
+      </div>    
+    `;
+
+        return L.divIcon({
+            html: htmlString,
+            className: '', 
+            iconSize: [60, 60],
+            iconAnchor: [30, 30],
+        });
+    };
+
+    return (
+        <Marker
+            position={[pin.lat, pin.lng]}
+            icon={createCustomIcon(pin.item || "Pinned Order", undefined, true)}
+            eventHandlers={{
+                click: fetchDetails,
+            }}
+        >
+            <Popup className="custom-marker-popup">
+                <div className="p-2 min-w-[180px] font-bitter">
+                    <h4 className="font-bold text-red-600 text-[10px] mb-1 uppercase tracking-wider">PINNED ORDER</h4>
+                    
+                    {loading ? (
+                        <div className="py-4 text-center text-xs text-gray-400">Loading details...</div>
+                    ) : (
+                        <>
+                            <div className="text-gray-900 font-bold text-base mb-0.5">{details?.item || pin.item || 'Generic Item'}</div>
+                            <div className="text-[10px] text-gray-400 mb-3 font-mono">ID: {(details?._id || pin.id)?.slice(-8).toUpperCase()}</div>
+                            
+                            <div className="space-y-2 text-[12px]">
+                                <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-1.5 rounded-lg">
+                                    <Store size={14} className="text-red-500 shrink-0" />
+                                    <span className="font-medium">{details?.shopType || pin.shopType || 'Not specified'}</span>
+                                </div>
+                                <div className="flex items-start gap-2 text-gray-600 px-1">
+                                    <MapPin size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                                    <span className="line-clamp-2">{details?.deliveryLocation || pin.deliveryLocation}</span>
+                                </div>
+                                
+                                {details?.deliveredBy && (
+                                    <div className="mt-2 pt-2 border-t border-gray-100 flex flex-col gap-1">
+                                        <div className="text-[9px] text-gray-400 uppercase font-bold">Selected Vendor</div>
+                                        <div className="text-gray-800 font-bold">{details.deliveredBy.name}</div>
+                                        <div className="text-gray-500 text-[10px]">{details.deliveredBy.phone}</div>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center gap-2 mt-3 pt-2 border-t border-red-50 border-dashed text-red-600 font-bold justify-center bg-red-50/30 rounded-lg py-1">
+                                    <Calendar size={14} />
+                                    <span>Until {new Date(details?.expiryAt || pin.expiryAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </Popup>
+        </Marker>
+    );
+};
 
 const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = false, onConfirmLocation, onCancelPicking, searchedLocation }, ref) => {
     const [mounted, setMounted] = useState(false);
@@ -45,6 +144,10 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
     // Used to track where the map is currently centered while dragging
     const [currentCenter, setCurrentCenter] = useState<[number, number] | null>(null);
     const [mapInstance, setMapInstance] = useState<LeafletMap | null>(null);
+    
+    // Dynamic data
+    const [vendors, setVendors] = useState<any[]>([]);
+    const [activePins, setActivePins] = useState<any[]>([]);
 
     const handleLocateMe = () => {
         if (mapInstance && position) {
@@ -58,9 +161,38 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
         }
     };
 
+    const fetchData = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            
+            // Fetch Vendors
+            const vendorRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor/all`);
+            const vendorData = await vendorRes.json();
+            if (vendorRes.ok) setVendors(vendorData.vendors || []);
+
+            // Fetch Active Pins (Redis) - GLOBAL for the map
+            const pinRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/map-active`);
+            const pinData = await pinRes.json();
+            if (pinRes.ok) setActivePins(pinData.activePins || []);
+
+        } catch (err) {
+            console.error("Failed to fetch map data:", err);
+        }
+    };
+
     useImperativeHandle(ref, () => ({
-        handleLocateMe
+        handleLocateMe,
+        refreshPins: fetchData
     }));
+
+    // Fetch Vendors and Active Pins
+    useEffect(() => {
+        if (mounted) {
+            fetchData();
+            const interval = setInterval(fetchData, 30000); // Poll every 30s
+            return () => clearInterval(interval);
+        }
+    }, [mounted]);
 
     useEffect(() => {
         setMounted(true);
@@ -92,15 +224,17 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
 
     const createCustomIcon = (name: string, iconUrl?: string) => {
         const L = require('leaflet');
+        const colorClass = 'bg-white text-gray-800';
+        
         const htmlString = `
       <div class="flex flex-col items-center justify-center -mt-6">
-        <div class="bg-white px-3 py-1 rounded-full shadow-md text-[10px]  text-gray-800 border border-gray-100 mb-1 whitespace-nowrap uppercase tracking-tighter">
+        <div class="${colorClass} px-3 py-1 rounded-full shadow-md text-[10px] border border-gray-100 mb-1 whitespace-nowrap uppercase tracking-tighter">
           ${name}
         </div>
-        <div class="w-10 h-10 rounded-full  overflow-hidden  flex items-center justify-center">
+        <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center shadow-md">
           ${iconUrl 
             ? `<img src="${iconUrl}" class="w-full h-full object-cover" />`
-            : `<div class="w-full h-full bg-red-50 flex items-center justify-center  font-bold text-xs">SS</div>`
+            : `<div class="w-full h-full bg-red-50 flex items-center justify-center font-bold text-xs">SS</div>`
           }
         </div>
       </div>    
@@ -152,12 +286,16 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
                     />
                 )}
 
-                {!isPickingLocation && VENDORS.map(vendor => (
+                {!isPickingLocation && vendors.map((vendor: any) => (
                     <Marker
-                        key={vendor.id}
+                        key={vendor._id}
                         position={[vendor.lat, vendor.lng]}
-                        icon={createCustomIcon(vendor.name, vendor.iconUrl)}
+                        icon={createCustomIcon(vendor.name, './Thela1.png')}
                     />
+                ))}
+
+                {!isPickingLocation && activePins.map((pin: any) => (
+                    <PinMarker key={pin.id} pin={pin} />
                 ))}
             </MapContainer>
 

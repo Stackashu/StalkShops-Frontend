@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface SidebarMenuProps {
     isOpen: boolean;
@@ -7,6 +8,7 @@ interface SidebarMenuProps {
 }
 
 export default function SidebarMenu({ isOpen, onClose }: SidebarMenuProps) {
+    const router = useRouter();
     const [role, setRole] = useState('User');
 
     useEffect(() => {
@@ -62,7 +64,13 @@ export default function SidebarMenu({ isOpen, onClose }: SidebarMenuProps) {
                 </div>
 
                 <div className="mt-auto p-6 flex justify-end">
-                    <button className="flex flex-col items-center gap-1">
+                    <button 
+                        onClick={() => {
+                            router.push(`/${role}/support`);
+                            onClose();
+                        }}
+                        className="flex flex-col items-center gap-1 hover:text-red-600 transition-all active:scale-90"
+                    >
                         <div className="w-10 h-10 rounded-full border-2 border-black flex items-center justify-center">
                             <span className="text-xl font-bold">Q</span>
                         </div>

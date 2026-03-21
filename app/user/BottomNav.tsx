@@ -1,6 +1,8 @@
 'use client';
 
 import { MapPin, LayoutList, ShoppingBag, Headset } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 interface BottomNavProps {
     onOpenLocationSelect: () => void;
@@ -8,6 +10,18 @@ interface BottomNavProps {
 }
 
 export default function BottomNav({ onOpenLocationSelect, pins = 0 }: BottomNavProps) {
+    const router = useRouter();
+    const [role, setRole] = useState('user');
+
+    useEffect(() => {
+        const savedRole = localStorage.getItem('role')?.toLowerCase() || 'user';
+        setRole(savedRole);
+    }, []);
+
+    const handleNavigation = (path: string) => {
+        router.push(`/${role}${path}`);
+    };
+
     return (
         <div className="relative">
             {/* Floating Action Button for Location */}
@@ -24,17 +38,26 @@ export default function BottomNav({ onOpenLocationSelect, pins = 0 }: BottomNavP
             </div>
 
             {/* Bottom Navigation Bar */}
-            <div className=" absolute bottom-0 w-full bg-white px-6-safe pt-2  flex items-center justify-between shadow-[0_-4px_12px_rgba(0,0,0,0.05)] rounded-t-2xl">
-                <button className="flex flex-col items-center gap-1 p-2 flex-1">
-                    <LayoutList className="w-6 h-6 text-black" />
+            <div className=" absolute bottom-0 w-full bg-white px-6-safe pt-2 pb-2  flex items-center justify-between shadow-[0_-4px_12px_rgba(0,0,0,0.05)] rounded-t-2xl">
+                <button
+                    onClick={() => handleNavigation('/manage-subscriptions')}
+                    className="flex flex-col items-center gap-1 p-2 flex-1 hover:text-red-600 transition-colors"
+                >
+                    <LayoutList className="w-6 h-6" />
                     <span className="text-xs font-semibold">Subscription</span>
                 </button>
-                <button className="flex flex-col items-center gap-1 p-2 flex-1">
-                    <ShoppingBag className="w-6 h-6 text-black" />
+                <button
+                    onClick={() => handleNavigation('/pinned-orders')}
+                    className="flex flex-col items-center gap-1 p-2 flex-1 hover:text-red-600 transition-colors"
+                >
+                    <ShoppingBag className="w-6 h-6" />
                     <span className="text-xs font-semibold"> Pinned Orders</span>
                 </button>
-                <button className="flex flex-col items-center gap-1 p-2 flex-1">
-                    <Headset className="w-6 h-6 text-black" />
+                <button
+                    onClick={() => handleNavigation('/support')}
+                    className="flex flex-col items-center gap-1 p-2 flex-1 hover:text-red-600 transition-colors"
+                >
+                    <Headset className="w-6 h-6" />
                     <span className="text-xs font-semibold">Support</span>
                 </button>
             </div>
