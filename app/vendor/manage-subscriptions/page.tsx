@@ -1,3 +1,3 @@
 'use client';
-import SubscriptionsModule from '../../component/modules/SubscriptionsModule';
-export default function VendorSubscriptions() { return <SubscriptionsModule />; }
+import VendorSubscriptionsModule from '../../component/modules/VendorSubscriptionsModule';
+export default function VendorSubscriptions() { return <VendorSubscriptionsModule />; }

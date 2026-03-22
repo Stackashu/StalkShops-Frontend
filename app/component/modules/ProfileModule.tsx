@@ -14,7 +14,7 @@ export default function ProfileModule() {
     const [formData, setFormData] = useState<any>({});
 
     useEffect(() => {
-        const savedRole = localStorage.getItem('role') || 'User';
+        const savedRole = (localStorage.getItem('role') || 'user').toLowerCase();
         const token = localStorage.getItem('token');
         setRole(savedRole);
         fetchProfile(savedRole, token);
@@ -22,7 +22,7 @@ export default function ProfileModule() {
 
     const fetchProfile = async (currentRole: string, token: string | null) => {
         try {
-            const endpoint = currentRole === 'Vendor' ? '/api/vendor' : '/api/user';
+            const endpoint = currentRole === 'vendor' ? '/api/vendor' : '/api/user';
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -49,8 +49,8 @@ export default function ProfileModule() {
         setSaving(true);
         try {
             const token = localStorage.getItem('token');
-            const endpoint = role === 'Vendor' ? '/api/vendor/updateVendor' : '/api/user/updateUser';
-            const payload = role === 'Vendor' ? formData : { userData: formData, ...formData };
+            const endpoint = role === 'vendor' ? '/api/vendor/updateVendor' : '/api/user/updateUser';
+            const payload = role === 'vendor' ? formData : { userData: formData, ...formData };
 
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
                 method: 'POST',
@@ -165,7 +165,7 @@ export default function ProfileModule() {
                             icon={<Clock size={20} />}
                         />
                     </div>
-                    {role === 'Vendor' && (
+                    {role === 'vendor' && (
                         <Field
                             label="Business Details"
                             value={formData?.businessInfo}

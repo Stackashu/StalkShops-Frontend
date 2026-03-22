@@ -13,6 +13,19 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const startServer = async () => {
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/`, {
+          method: 'GET',
+        });
+      } catch (err) {
+        console.error("Failed to ping server:", err);
+      }
+    };
+    startServer();
+  }, []);
+
+  useEffect(() => {
     if (!mounted) return;
 
     const timer = setTimeout(() => {

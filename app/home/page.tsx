@@ -15,14 +15,14 @@ export default function Home() {
 
     useEffect(() => {
         setMounted(true);
-        const savedRole = localStorage.getItem('role') || 'User';
+        const savedRole = localStorage.getItem('role')?.toLowerCase() || 'user';
         setRole(savedRole);
     }, []);
 
     console.log("renderd");
     if (!mounted) return null;
 
-    if (role === 'Vendor') {
+    if (role === 'vendor') {
         return <VendorHome />;
     }
 

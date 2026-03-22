@@ -26,9 +26,12 @@ const Popup = dynamic(
 
 export interface MapAreaProps {
     isPickingLocation?: boolean;
-    onConfirmLocation?: (lat: number, lng: number) => void;
+    onConfirmLocation?: (lat: number, lng: number, name: string) => void;
     onCancelPicking?: () => void;
     searchedLocation?: { lat: number, lng: number } | null;
+    isVendorMode?: boolean;
+    isTracking?: boolean;
+    onDataUpdate?: (data: { activePinsCount: number, userCount: number }) => void;
     ref?: React.Ref<MapAreaHandle>;
 }
 
@@ -36,6 +39,61 @@ export interface MapAreaHandle {
     handleLocateMe: () => void;
     refreshPins: () => void;
 }
+
+// Utility to create icons - pulled outside to avoid recreation
+const createCustomIcon = (name: string, iconUrl?: string, isUserPin?: boolean) => {
+    if (typeof window === 'undefined') return null;
+    const L = require('leaflet');
+    const colorClass = isUserPin ? 'bg-blue-600 text-white' : 'bg-white text-gray-800';
+    
+    const htmlString = `
+  <div class="flex flex-col items-center justify-center -mt-6">
+    <div class="${colorClass} px-3 py-1 rounded-full shadow-md text-[10px] border border-gray-100 mb-1 whitespace-nowrap uppercase tracking-tighter font-bold">
+      ${name}
+    </div>
+    <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center shadow-lg border-2 border-white">
+      ${iconUrl 
+        ? `<img src="${iconUrl}" class="w-full h-full object-cover" />`
+        : `<div class="w-full h-full ${isUserPin ? 'bg-blue-600' : 'bg-red-50' } flex items-center justify-center shadow-inner">
+            <div class="w-3 h-3 bg-white rounded-full"></div>
+           </div>`
+      }
+    </div>
+  </div>    
+`;
+
+    return L.divIcon({
+        html: htmlString,
+        className: '', 
+        iconSize: [60, 60],
+        iconAnchor: [30, 30],
+    });
+};
+
+const createVendorIcon = (name: string, iconUrl: string) => {
+    if (typeof window === 'undefined') return null;
+    const L = require('leaflet');
+    const htmlString = `
+  <div class="flex flex-col items-center justify-center -mt-10">
+    <div class="bg-black/80 backdrop-blur-md text-white px-3 py-1 rounded-full shadow-2xl text-[9px] border border-white/20 mb-1 whitespace-nowrap uppercase tracking-widest font-black ring-2 ring-red-500/20">
+      ${name}
+    </div>
+    <div class="relative group">
+        <div class="absolute -inset-1 rounded-full blur opacity-25 group-hover:opacity-50 transition-opacity"></div>
+        <div class="relative w-14 h-14 rounded-full overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform">
+            <img src="${iconUrl}" class="w-full h-full object-cover p-1" />
+        </div>
+    </div>
+  </div>    
+`;
+
+    return L.divIcon({
+        html: htmlString,
+        className: 'animate-in fade-in zoom-in duration-500', 
+        iconSize: [80, 80],
+        iconAnchor: [40, 40],
+    });
+};
 
 // Sub-component for individual Pin Markers to handle detail fetching
 const PinMarker = ({ pin }: { pin: any }) => {
@@ -47,7 +105,7 @@ const PinMarker = ({ pin }: { pin: any }) => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/${pin.id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/${pin.id || pin._id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
@@ -59,38 +117,10 @@ const PinMarker = ({ pin }: { pin: any }) => {
         }
     };
 
-    const createCustomIcon = (name: string, iconUrl?: string, isUserPin?: boolean) => {
-        const L = require('leaflet');
-        const colorClass = isUserPin ? 'bg-blue-600 text-white' : 'bg-white text-gray-800';
-        
-        const htmlString = `
-      <div class="flex flex-col items-center justify-center -mt-6">
-        <div class="${colorClass} px-3 py-1 rounded-full shadow-md text-[10px] border border-gray-100 mb-1 whitespace-nowrap uppercase tracking-tighter font-bold">
-          ${name}
-        </div>
-        <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center shadow-lg border-2 border-white">
-          ${iconUrl 
-            ? `<img src="${iconUrl}" class="w-full h-full object-cover" />`
-            : `<div class="w-full h-full ${isUserPin ? 'bg-blue-600' : 'bg-red-500'} flex items-center justify-center shadow-inner">
-                <div class="w-3 h-3 bg-white rounded-full"></div>
-               </div>`
-          }
-        </div>
-      </div>    
-    `;
-
-        return L.divIcon({
-            html: htmlString,
-            className: '', 
-            iconSize: [60, 60],
-            iconAnchor: [30, 30],
-        });
-    };
-
     return (
         <Marker
             position={[pin.lat, pin.lng]}
-            icon={createCustomIcon(pin.item || "Pinned Order", undefined, true)}
+            icon={createCustomIcon(pin.item || "Pinned Order", '/SSbag.png', true)!}
             eventHandlers={{
                 click: fetchDetails,
             }}
@@ -104,7 +134,7 @@ const PinMarker = ({ pin }: { pin: any }) => {
                     ) : (
                         <>
                             <div className="text-gray-900 font-bold text-base mb-0.5">{details?.item || pin.item || 'Generic Item'}</div>
-                            <div className="text-[10px] text-gray-400 mb-3 font-mono">ID: {(details?._id || pin.id)?.slice(-8).toUpperCase()}</div>
+                            <div className="text-[10px] text-gray-400 mb-3 font-mono">ID: {(details?._id || pin.id || pin._id)?.slice(-8).toUpperCase()}</div>
                             
                             <div className="space-y-2 text-[12px]">
                                 <div className="flex items-center gap-2 text-gray-700 bg-gray-50 p-1.5 rounded-lg">
@@ -137,7 +167,22 @@ const PinMarker = ({ pin }: { pin: any }) => {
     );
 };
 
-const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = false, onConfirmLocation, onCancelPicking, searchedLocation }, ref) => {
+// Custom component to track center during drag
+const MapEventsHandler = ({ onCenterChange }: { onCenterChange: (lat: number, lng: number) => void }) => {
+    const { useMapEvents } = require('react-leaflet');
+    
+    useMapEvents({
+        moveend: (e: any) => {
+            const map = e.target;
+            const center = map.getCenter();
+            onCenterChange(center.lat, center.lng);
+        }
+    });
+
+    return null;
+};
+
+const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = false, onConfirmLocation, onCancelPicking, searchedLocation, isVendorMode, isTracking, onDataUpdate }, ref) => {
     const [mounted, setMounted] = useState(false);
     const [position, setPosition] = useState<[number, number]>([28.6139, 77.2090]);
     const [hasCentered, setHasCentered] = useState(false);
@@ -148,6 +193,9 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
     // Dynamic data
     const [vendors, setVendors] = useState<any[]>([]);
     const [activePins, setActivePins] = useState<any[]>([]);
+    
+    // Memoized icons to prevent Marker redraws
+    const userLocationIcon = React.useMemo(() => createCustomIcon("You Are Here")!, []);
 
     const handleLocateMe = () => {
         if (mapInstance && position) {
@@ -161,24 +209,51 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
         }
     };
 
-    const fetchData = async () => {
+    const fetchData = React.useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
+            console.log(`[MapArea] Fetching data for ${isVendorMode ? 'Vendor' : 'User'} mode at [${position[0]}, ${position[1]}]`);
             
-            // Fetch Vendors
-            const vendorRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor/all`);
-            const vendorData = await vendorRes.json();
-            if (vendorRes.ok) setVendors(vendorData.vendors || []);
+            // 1. Fetch Vendors (Nearby active vendors for users)
+            if (!isVendorMode) {
+                const vendorRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor/nearby-vendors?lat=${position[0]}&lng=${position[1]}`);
+                const vendorData = await vendorRes.json();
+                if (vendorRes.ok) {
+                    console.log(`[MapArea] Found ${vendorData.vendors?.length || 0} nearby vendors`);
+                    setVendors(vendorData.vendors || []);
+                }
+            }
 
-            // Fetch Active Pins (Redis) - GLOBAL for the map
-            const pinRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/map-active`);
-            const pinData = await pinRes.json();
-            if (pinRes.ok) setActivePins(pinData.activePins || []);
+            // 2. Fetch Pins
+            if (isVendorMode) {
+                // Vendors: Fetch Nearby Pins
+                const nearbyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/nearby?lat=${position[0]}&lng=${position[1]}`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                const nearbyData = await nearbyRes.json();
+                if (nearbyRes.ok) {
+                    console.log(`[MapArea] Found ${nearbyData.activePins?.length || 0} nearby orders`);
+                    setActivePins(nearbyData.activePins || []);
+                    if (onDataUpdate) {
+                        onDataUpdate({
+                            activePinsCount: nearbyData.activePins?.length || 0,
+                            userCount: nearbyData.userCount || 0
+                        });
+                    }
+                }
+            } else {
+                // Users: Fetch Global Active Pins
+                const pinRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/map-active`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                const pinData = await pinRes.json();
+                if (pinRes.ok) setActivePins(pinData.activePins || []);
+            }
 
         } catch (err) {
             console.error("Failed to fetch map data:", err);
         }
-    };
+    }, [isVendorMode, position[0], position[1], onDataUpdate]);
 
     useImperativeHandle(ref, () => ({
         handleLocateMe,
@@ -189,10 +264,10 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
     useEffect(() => {
         if (mounted) {
             fetchData();
-            const interval = setInterval(fetchData, 30000); // Poll every 30s
+            const interval = setInterval(fetchData, 5000); // Optimized: Poll every 5s
             return () => clearInterval(interval);
         }
-    }, [mounted]);
+    }, [mounted, fetchData]); 
 
     useEffect(() => {
         setMounted(true);
@@ -213,55 +288,22 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
 
     // Fly to searched location when it changes
     useEffect(() => {
-        if (searchedLocation && mapInstance) {
+        if (searchedLocation && searchedLocation.lat != null && searchedLocation.lng != null && mapInstance) {
             mapInstance.flyTo([searchedLocation.lat, searchedLocation.lng], 15, { animate: true });
         }
     }, [searchedLocation, mapInstance]);
 
+    const handleCenterChange = React.useCallback((lat: number, lng: number) => {
+        setCurrentCenter([lat, lng]);
+    }, []);
+
+    const onMapRef = React.useCallback((map: LeafletMap | null) => {
+        if (map) setMapInstance(map);
+    }, []);
+
     if (!mounted) {
         return <div className="h-full w-full bg-gray-200 animate-pulse flex items-center justify-center">Loading Map...</div>;
     }
-
-    const createCustomIcon = (name: string, iconUrl?: string) => {
-        const L = require('leaflet');
-        const colorClass = 'bg-white text-gray-800';
-        
-        const htmlString = `
-      <div class="flex flex-col items-center justify-center -mt-6">
-        <div class="${colorClass} px-3 py-1 rounded-full shadow-md text-[10px] border border-gray-100 mb-1 whitespace-nowrap uppercase tracking-tighter">
-          ${name}
-        </div>
-        <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center shadow-md">
-          ${iconUrl 
-            ? `<img src="${iconUrl}" class="w-full h-full object-cover" />`
-            : `<div class="w-full h-full bg-red-50 flex items-center justify-center font-bold text-xs">SS</div>`
-          }
-        </div>
-      </div>    
-    `;
-
-        return L.divIcon({
-            html: htmlString,
-            className: '', 
-            iconSize: [60, 60],
-            iconAnchor: [30, 30],
-        });
-    };
-
-    // Custom component to track center during drag
-    const MapEventsHandler = () => {
-        const { useMapEvents } = require('react-leaflet');
-        
-        useMapEvents({
-            moveend: (e: any) => {
-                const map = e.target;
-                const center = map.getCenter();
-                setCurrentCenter([center.lat, center.lng]);
-            }
-        });
-
-        return null;
-    };
 
     return (
         <div className="relative h-full w-full">
@@ -271,31 +313,35 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
                 scrollWheelZoom={true}
                 className="h-full w-full z-0"
                 zoomControl={false}
-                ref={setMapInstance}
+                ref={onMapRef}
             >
-                <MapEventsHandler />
+                <MapEventsHandler onCenterChange={handleCenterChange} />
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                 />
 
-                {!isPickingLocation && (
+                {!isPickingLocation && position && position[0] != null && position[1] != null && (
                     <Marker
                         position={position}
-                        icon={createCustomIcon("You Are Here")}
+                        icon={userLocationIcon}
                     />
                 )}
 
                 {!isPickingLocation && vendors.map((vendor: any) => (
-                    <Marker
-                        key={vendor._id}
-                        position={[vendor.lat, vendor.lng]}
-                        icon={createCustomIcon(vendor.name, './Thela1.png')}
-                    />
+                    vendor.lat != null && vendor.lng != null && (
+                        <Marker
+                            key={vendor._id}
+                            position={[vendor.lat, vendor.lng]}
+                            icon={createVendorIcon(vendor.name || "Live Vendor", '/Thela1.png')!}
+                        />
+                    )
                 ))}
 
                 {!isPickingLocation && activePins.map((pin: any) => (
-                    <PinMarker key={pin.id} pin={pin} />
+                    pin.lat != null && pin.lng != null && (
+                        <PinMarker key={pin.id || pin._id} pin={pin} />
+                    )
                 ))}
             </MapContainer>
 
@@ -338,9 +384,9 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
                         <button
                             onClick={() => {
                                 if (onConfirmLocation && currentCenter) {
-                                    onConfirmLocation(currentCenter[0], currentCenter[1]);
+                                    onConfirmLocation(currentCenter[0], currentCenter[1], "Custom Location");
                                 } else if (onConfirmLocation) {
-                                    onConfirmLocation(position[0], position[1]);
+                                    onConfirmLocation(position[0], position[1], "My Current Location");
                                 }
                             }}
                             className="w-full bg-red-600 active:bg-red-700 text-white py-4 rounded-full font-bold shadow-lg text-lg flex justify-center items-center transition-colors"
