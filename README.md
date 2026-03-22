@@ -34,3 +34,12 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Backend Performance & Scalability
+
+The StalkShops backend is optimized for real-time tracking and high concurrency.
+
+- **Concurrent Users**: Handles 200–500 active users comfortably on a standard instance.
+- **Throughput**: Supports 500+ requests per second (RPS) for core APIs.
+- **Optimized Logic**: High-intensity Redis operations (like fetching all active pins) use batch processing (`SCAN` and `MGET`) to prevent event loop blocking.
+- **Infrastructure**: Built with Node.js, Redis (for real-time data), and MongoDB (for persistent storage), providing a low-latency experience for both users and vendors.

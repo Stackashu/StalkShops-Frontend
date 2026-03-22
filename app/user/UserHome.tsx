@@ -10,9 +10,9 @@ import { toast } from 'react-toastify';
 import { useSocket } from '../../hooks/useSocket';
 
 const MapArea = dynamic<MapAreaProps>(() => import('../component/MapArea'), { ssr: false });
-import TopBar from './TopBar';
+import TopBar from '../component/TopBar';
 import BottomNav from './BottomNav';
-import SidebarMenu from './SidebarMenu';
+import SidebarMenu from '../component/SidebarMenu';
 import SearchVendors from './SearchVendors';
 import LocationSelect from './LocationSelect';
 import LocationGuard from '../component/LocationGuard';
@@ -36,11 +36,30 @@ export default function UserHome() {
     // Socket.io integration
     const socket = useSocket(userData?._id);
 
+    useEffect(() => {
+        // Send initial location and start heartbeats if allowed
+        if (userData?._id && navigator.geolocation) {
+            const sendUpdate = () => {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    socket?.emit("user_update_location", {
+                        userId: userData._id,
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude
+                    });
+                });
+            };
+            
+            sendUpdate();
+            const interval = setInterval(sendUpdate, 30000); // Every 30s
+            return () => clearInterval(interval);
+        }
+    }, [userData?._id, socket]);
+
     const fetchProfile = async () => {
         try {
             const token = localStorage.getItem('token');
-            const role = localStorage.getItem('role') || 'User';
-            const endpoint = role === 'Vendor' ? '/api/vendor' : '/api/user';
+            const role = localStorage.getItem('role')?.toLowerCase() || 'user';
+            const endpoint = role === 'vendor' ? '/api/vendor' : '/api/user';
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -54,6 +73,7 @@ export default function UserHome() {
     };
 
     useEffect(() => {
+        localStorage.setItem('role', 'user');
         fetchProfile();
     }, []);
 
@@ -92,6 +112,7 @@ export default function UserHome() {
                                 onOpenSidebar={() => setIsSidebarOpen(true)}
                                 onOpenSearch={() => setIsSearchOpen(true)}
                                 onLogout={() => setIsLogoutDialogOpen(true)}
+                                userName={userData?.name}
                             />
                         </div>
 

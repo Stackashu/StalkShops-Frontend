@@ -20,12 +20,75 @@ const SignUpPage = () => {
         address: '',
         dob: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        otp: ''
     });
     const [loading, setLoading] = useState(false);
+    const [otpSent, setOtpSent] = useState(false);
+    const [otpVerified, setOtpVerified] = useState(false);
+    const [sendingOtp, setSendingOtp] = useState(false);
+    const [verifyingOtp, setVerifyingOtp] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSendOtp = async () => {
+        if (!formData.email) {
+            toast.error("Please enter your email first");
+            return;
+        }
+
+        setSendingOtp(true);
+        try {
+            const endpoint = role === 'user' ? '/api/user/sendOtp' : '/api/vendor/sendOtp';
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: formData.email })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                setOtpSent(true);
+                toast.success("OTP sent to your email!");
+            } else {
+                toast.error(data.error || "Failed to send OTP");
+            }
+        } catch (err) {
+            toast.error("Connection error");
+        } finally {
+            setSendingOtp(false);
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        if (!formData.otp) {
+            toast.error("Please enter the OTP");
+            return;
+        }
+
+        setVerifyingOtp(true);
+        try {
+            const endpoint = role === 'user' ? '/api/user/verifyOtp' : '/api/vendor/verifyOtp';
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: formData.email, otp: formData.otp })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                setOtpVerified(true);
+                toast.success("Email verified successfully!");
+            } else {
+                toast.error(data.error || "Invalid OTP");
+            }
+        } catch (err) {
+            toast.error("Connection error");
+        } finally {
+            setVerifyingOtp(false);
+        }
     };
 
     const handleSignUp = async () => {
@@ -128,15 +191,58 @@ const SignUpPage = () => {
                         {/* Email */}
                         <div className="flex flex-col gap-1">
                             <label className="text-sm font-semibold text-gray-800">Email <span className="text-red-500">*</span></label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                placeholder="Enter your Email"
-                                className="border-b border-gray-300 outline-none py-2 text-sm text-gray-900 bg-transparent focus:border-[#fd3131] transition-colors"
-                            />
+                            <div className="flex gap-2">
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    disabled={otpSent || otpVerified}
+                                    placeholder="Enter your Email"
+                                    className="border-b border-gray-300 outline-none py-2 text-sm text-gray-900 bg-transparent focus:border-[#fd3131] transition-colors flex-1"
+                                />
+                                {!otpVerified && (
+                                    <button 
+                                        onClick={handleSendOtp}
+                                        disabled={sendingOtp || !formData.email}
+                                        className="text-xs font-bold text-red-600 hover:underline disabled:opacity-50"
+                                    >
+                                        {sendingOtp ? 'Sending...' : otpSent ? 'Resend OTP' : 'Send OTP'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
+
+                        {/* OTP Input - Show only if OTP sent and not yet verified */}
+                        {otpSent && !otpVerified && (
+                            <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <label className="text-sm font-semibold text-gray-800">Enter OTP <span className="text-red-500">*</span></label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        name="otp"
+                                        value={formData.otp}
+                                        onChange={handleChange}
+                                        placeholder="6-digit OTP"
+                                        className="border-b border-gray-300 outline-none py-2 text-sm text-gray-900 bg-transparent focus:border-[#fd3131] transition-colors flex-1"
+                                    />
+                                    <button 
+                                        onClick={handleVerifyOtp}
+                                        disabled={verifyingOtp || !formData.otp}
+                                        className="text-xs font-bold text-green-600 hover:underline disabled:opacity-50"
+                                    >
+                                        {verifyingOtp ? 'Verifying...' : 'Verify OTP'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {otpVerified && (
+                            <div className="text-xs text-green-600 font-bold flex items-center gap-1">
+                                <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+                                Email Verified
+                            </div>
+                        )}
 
                         {/* Phone */}
                         <div className="flex flex-col gap-1">
@@ -153,7 +259,7 @@ const SignUpPage = () => {
 
                         <button
                             onClick={() => setStep(2)}
-                            disabled={!formData.email || !formData.firstName || !formData.phone}
+                            disabled={!formData.email || !formData.firstName || !formData.phone || !otpVerified}
                             className="mainBgColor text-white font-semibold py-4 rounded-full text-base w-full mt-4 hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
                             Next

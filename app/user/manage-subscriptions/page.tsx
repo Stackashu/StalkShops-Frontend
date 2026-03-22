@@ -1,3 +1,3 @@
 'use client';
-import SubscriptionsModule from '../../component/modules/SubscriptionsModule';
-export default function UserSubscriptions() { return <SubscriptionsModule />; }
+import UserSubscriptionsModule from '../../component/modules/UserSubscriptionsModule';
+export default function UserSubscriptions() { return <UserSubscriptionsModule />; }
