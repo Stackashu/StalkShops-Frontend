@@ -35,6 +35,12 @@ export default function SidebarMenu({ isOpen, onClose }: SidebarMenuProps) {
             console.error("Failed to fetch sidebar profile:", err);
         }
     };
+    
+    const formatDisplayName = (name?: string) => {
+        if (!name) return '';
+        const firstName = name.trim().split(' ')[0];
+        return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+    };
 
     const MENU_ITEMS = [
         { name: 'Profile', path: `/${role}/profile` },
@@ -68,7 +74,7 @@ export default function SidebarMenu({ isOpen, onClose }: SidebarMenuProps) {
                             )}
                         </div>
                         <div className="flex flex-col truncate">
-                            <span className="text-lg font-black text-gray-900 truncate">{profile?.name || 'StalkShops User'}</span>
+                            <span className="text-lg font-black text-gray-900 truncate">{formatDisplayName(profile?.name) || 'User'}</span>
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{role}</span>
                         </div>
                     </div>

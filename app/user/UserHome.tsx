@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { LocateFixed } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useSocket } from '../../hooks/useSocket';
+import { requestNotificationPermission } from '../utils/notifications';
 
 const MapArea = dynamic<MapAreaProps>(() => import('../component/MapArea'), { ssr: false });
 import TopBar from '../component/TopBar';
@@ -15,7 +16,7 @@ import BottomNav from './BottomNav';
 import SidebarMenu from '../component/SidebarMenu';
 import SearchVendors from './SearchVendors';
 import LocationSelect from './LocationSelect';
-import LocationGuard from '../component/LocationGuard';
+// import PermissionGuard from '../component/PermissionGuard';
 import LogoutDialog from '../component/LogoutDialog';
 import { MapAreaHandle, MapAreaProps } from '../component/MapArea';
 
@@ -75,6 +76,25 @@ export default function UserHome() {
     useEffect(() => {
         localStorage.setItem('role', 'user');
         fetchProfile();
+
+        // Refetch pin count whenever user returns to the tab/window
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchProfile();
+            }
+        };
+        const handleFocus = () => fetchProfile();
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleFocus);
+
+        // FCM Permission
+        requestNotificationPermission();
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('focus', handleFocus);
+        };
     }, []);
 
     const handleLogout = () => {
@@ -85,7 +105,7 @@ export default function UserHome() {
     };
 
     return (
-        <LocationGuard>
+        // <LocationGuard>
             <div className="relative h-dvh w-full overflow-hidden bg-gray-100 font-bitter">
                 {/* Background Map layer */}
                 <div className="absolute inset-0 z-0">
@@ -157,9 +177,11 @@ export default function UserHome() {
                         setIsPickingLocation(true);
                     }}
                     pickedLocation={pickedLocation}
+                    onRemoveLocation={() => setPickedLocation(null)}
                     onPinSuccess={() => {
                         mapRef.current?.refreshPins();
                         fetchProfile();
+                        setPickedLocation(null);
                     }}
                 />
 
@@ -170,6 +192,6 @@ export default function UserHome() {
                     onConfirm={handleLogout}
                 />
             </div>
-        </LocationGuard>
+        // {/* </PermissionGuard> */}
     );
 }

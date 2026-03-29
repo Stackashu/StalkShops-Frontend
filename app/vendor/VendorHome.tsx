@@ -12,6 +12,8 @@ import { useRouter } from 'next/navigation';
 import { useSocket } from '../../hooks/useSocket';
 import { toast } from 'react-toastify';
 import VendorBottomNav from './VendorBottomNav';
+import { requestNotificationPermission } from '../utils/notifications';
+import PermissionGuard from '../component/PermissionGuard';
 
 export default function VendorHome() {
     const router = useRouter();
@@ -33,6 +35,10 @@ export default function VendorHome() {
     useEffect(() => {
         fetchVendorProfile();
         localStorage.setItem('role', 'vendor');
+
+        // FCM Permission
+        requestNotificationPermission();
+
         return () => {
             if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
         };
@@ -42,7 +48,7 @@ export default function VendorHome() {
         try {
             const token = localStorage.getItem('token');
             if (!token) {
-                router.push('/login');
+                router.push('/sign-in');
                 return;
             }
 
@@ -54,7 +60,7 @@ export default function VendorHome() {
                 setVendorData(data.vendorFound);
             } else {
                 toast.error("Session expired");
-                router.push('/login');
+                router.push('/sign-in');
             }
         } catch (err) {
             toast.error("Failed to load profile");
@@ -88,11 +94,16 @@ export default function VendorHome() {
 
     const sendLocationUpdate = (lat: number, lng: number) => {
         if (!vendorData?._id) return;
-        
-        // Check if location actually changed
+
+        // Precision threshold: 0.00001 is approx 1.1 meters
+        // This prevents jitter and unnecessary requests if the vendor is stationary
         const last = lastLocationRef.current;
-        if (last && last.lat === lat && last.lng === lng) {
-            console.log(`[Socket] Location unchanged (${lat}, ${lng}), skipping update.`);
+        const hasMoved = !last ||
+            Math.abs(last.lat - lat) > 0.00001 ||
+            Math.abs(last.lng - lng) > 0.00001;
+
+        if (!hasMoved) {
+            console.log(`[Socket] Position near-identical (${lat.toFixed(5)}, ${lng.toFixed(5)}), skipping update.`);
             return;
         }
 
@@ -120,7 +131,7 @@ export default function VendorHome() {
                     lng: longitude
                 });
                 lastLocationRef.current = { lat: latitude, lng: longitude };
-                
+
                 // Start periodic updates
                 const interval = setInterval(() => {
                     navigator.geolocation.getCurrentPosition((p) => {
@@ -155,13 +166,14 @@ export default function VendorHome() {
     );
 
     return (
+
         <div className="relative h-dvh w-full overflow-hidden bg-gray-100 font-bitter">
             {/* Background Map Layer */}
             <div className="absolute inset-0 z-0">
-                <MapArea 
+                <MapArea
                     ref={mapRef}
-                    isVendorMode={true} 
-                    isTracking={isTracking} 
+                    isVendorMode={true}
+                    isTracking={isTracking}
                     onDataUpdate={(data) => setNearbyOrdersCount(data.activePinsCount)}
                 />
             </div>
@@ -169,18 +181,17 @@ export default function VendorHome() {
             {/* Top Navigation Overlay */}
             <div className="absolute top-4 left-0 right-0 px-4 z-50 pointer-events-none flex flex-col gap-2">
                 <div className="pointer-events-auto">
-                    <TopBar 
-                        onOpenSidebar={() => setIsSidebarOpen(true)} 
+                    <TopBar
+                        onOpenSidebar={() => setIsSidebarOpen(true)}
                         onLogout={() => setIsLogoutDialogOpen(true)}
                         userName={vendorData?.name}
                         middleAction={
                             <button
                                 onClick={handleToggleTracking}
-                                className={`w-full h-12 rounded-full font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 ${
-                                    isTracking 
-                                    ? 'bg-red-600 text-white' 
-                                    : 'bg-white text-red-600 border border-gray-100'
-                                }`}
+                                className={`w-full h-12 rounded-full font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 ${isTracking
+                                        ? 'bg-red-600 text-white'
+                                        : 'bg-white text-red-600 border border-gray-100'
+                                    }`}
                             >
                                 {isTracking ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
                                 {isTracking ? 'STOP SERVING' : 'START SERVING'}
@@ -208,9 +219,9 @@ export default function VendorHome() {
             <SidebarMenu isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
             {/* Bottom Nav Stats */}
-            <VendorBottomNav 
-                completedToday={completedToday} 
-                nearbyOrders={nearbyOrdersCount} 
+            <VendorBottomNav
+                completedToday={completedToday}
+                nearbyOrders={nearbyOrdersCount}
             />
 
             {/* Logout Confirmation Dialog */}
@@ -219,6 +230,7 @@ export default function VendorHome() {
                 onClose={() => setIsLogoutDialogOpen(false)}
                 onConfirm={handleLogout}
             />
+            {/* <PermissionGuard /> */}
         </div>
     );
 }
