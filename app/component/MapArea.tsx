@@ -95,25 +95,66 @@ const createVendorIcon = (name: string, iconUrl: string) => {
     });
 };
 
+// Function to capitalize and format names centrally
+const formatDisplayName = (name?: string) => {
+    if (!name) return '';
+    const firstName = name.trim().split(' ')[0];
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+};
+
 // Sub-component for individual Pin Markers to handle detail fetching
-const PinMarker = ({ pin }: { pin: any }) => {
+const PinMarker = React.memo(({ pin, isVendorMode, onRefresh }: { pin: any, isVendorMode?: boolean, onRefresh?: () => void }) => {
     const [details, setDetails] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
+    const [fetchError, setFetchError] = useState(false);
 
     const fetchDetails = async () => {
-        if (details) return; // Only fetch once
+        if (details || loading) return; 
         setLoading(true);
+        setFetchError(false);
         try {
             const token = localStorage.getItem('token');
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/${pin.id || pin._id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
-            if (res.ok) setDetails(data.pin);
+            if (res.ok) {
+                setDetails(data.pin);
+            } else if (res.status === 404) {
+                setFetchError(true);
+            }
         } catch (err) {
             console.error("Failed to fetch pin details:", err);
+            setFetchError(true);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleConfirm = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsConfirming(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/confirm/${pin.id || pin._id}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                const toast = (await import('react-toastify')).toast;
+                toast.success("Order confirmed!");
+                if (onRefresh) onRefresh();
+                setDetails(data.pin); // Update local details
+            } else {
+                const toast = (await import('react-toastify')).toast;
+                toast.error(data.error || "Failed to confirm order");
+            }
+        } catch (err) {
+            console.error("Confirmation error:", err);
+        } finally {
+            setIsConfirming(false);
         }
     };
 
@@ -146,18 +187,50 @@ const PinMarker = ({ pin }: { pin: any }) => {
                                     <span className="line-clamp-2">{details?.deliveryLocation || pin.deliveryLocation}</span>
                                 </div>
                                 
-                                {details?.deliveredBy && (
+                                {/* For Vendors: Show Customer Details */}
+                                {isVendorMode && details?.orderedBy && (
+                                    <div className="mt-2 pt-2 border-t border-red-50 flex flex-col gap-1 bg-red-50/20 p-2 rounded-lg border-dashed border">
+                                        <div className="text-[9px] text-red-400 uppercase font-black tracking-widest">CUSTOMER DETAILS</div>
+                                        <div className="text-gray-800 font-bold text-sm">{formatDisplayName(details.orderedBy.name)}</div>
+                                        <div className="text-red-500 font-mono text-[10px]">{details.orderedBy.phone}</div>
+                                    </div>
+                                )}
+
+                                {/* If vendor already confirmed or specifically selected */}
+                                {details?.deliveredBy && !isVendorMode && (
                                     <div className="mt-2 pt-2 border-t border-gray-100 flex flex-col gap-1">
-                                        <div className="text-[9px] text-gray-400 uppercase font-bold">Selected Vendor</div>
+                                        <div className="text-[9px] text-gray-400 uppercase font-bold">Assigned Vendor</div>
                                         <div className="text-gray-800 font-bold">{details.deliveredBy.name}</div>
                                         <div className="text-gray-500 text-[10px]">{details.deliveredBy.phone}</div>
                                     </div>
+                                )}
+
+                                {fetchError && (
+                                    <div className="text-[10px] text-red-400 text-center py-2">Couldn't load extra info</div>
                                 )}
 
                                 <div className="flex items-center gap-2 mt-3 pt-2 border-t border-red-50 border-dashed text-red-600 font-bold justify-center bg-red-50/30 rounded-lg py-1">
                                     <Calendar size={14} />
                                     <span>Until {new Date(details?.expiryAt || pin.expiryAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                 </div>
+
+                                {isVendorMode && (details?.status !== 'confirmed') && (
+                                    <button
+                                        onClick={handleConfirm}
+                                        disabled={isConfirming}
+                                        className="w-full mt-3 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        {isConfirming ? (
+                                            <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full font-mono"></span>
+                                        ) : "CONFIRM ORDER"}
+                                    </button>
+                                )}
+
+                                {details?.status === 'confirmed' && (
+                                    <div className="mt-3 bg-green-50 text-green-600 py-2 rounded-lg font-bold text-[10px] text-center uppercase border border-green-100">
+                                        Confirmed ✓
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}
@@ -165,7 +238,7 @@ const PinMarker = ({ pin }: { pin: any }) => {
             </Popup>
         </Marker>
     );
-};
+});
 
 // Custom component to track center during drag
 const MapEventsHandler = ({ onCenterChange }: { onCenterChange: (lat: number, lng: number) => void }) => {
@@ -212,11 +285,13 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
     const fetchData = React.useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
-            console.log(`[MapArea] Fetching data for ${isVendorMode ? 'Vendor' : 'User'} mode at [${position[0]}, ${position[1]}]`);
+            const searchPos = currentCenter || position;
+            
+            console.log(`[MapArea] Fetching data for ${isVendorMode ? 'Vendor' : 'User'} mode at [${searchPos[0]}, ${searchPos[1]}]`);
             
             // 1. Fetch Vendors (Nearby active vendors for users)
             if (!isVendorMode) {
-                const vendorRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor/nearby-vendors?lat=${position[0]}&lng=${position[1]}`);
+                const vendorRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor/nearby-vendors?lat=${searchPos[0]}&lng=${searchPos[1]}`);
                 const vendorData = await vendorRes.json();
                 if (vendorRes.ok) {
                     console.log(`[MapArea] Found ${vendorData.vendors?.length || 0} nearby vendors`);
@@ -227,7 +302,7 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
             // 2. Fetch Pins
             if (isVendorMode) {
                 // Vendors: Fetch Nearby Pins
-                const nearbyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/nearby?lat=${position[0]}&lng=${position[1]}`, {
+                const nearbyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pins/nearby?lat=${searchPos[0]}&lng=${searchPos[1]}`, {
                     headers: token ? { 'Authorization': `Bearer ${token}` } : {}
                 });
                 const nearbyData = await nearbyRes.json();
@@ -253,7 +328,7 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
         } catch (err) {
             console.error("Failed to fetch map data:", err);
         }
-    }, [isVendorMode, position[0], position[1], onDataUpdate]);
+    }, [isVendorMode, position, currentCenter, onDataUpdate]);
 
     useImperativeHandle(ref, () => ({
         handleLocateMe,
@@ -340,7 +415,12 @@ const MapArea = forwardRef<MapAreaHandle, MapAreaProps>(({ isPickingLocation = f
 
                 {!isPickingLocation && activePins.map((pin: any) => (
                     pin.lat != null && pin.lng != null && (
-                        <PinMarker key={pin.id || pin._id} pin={pin} />
+                        <PinMarker 
+                            key={pin.id || pin._id} 
+                            pin={pin} 
+                            isVendorMode={isVendorMode} 
+                            onRefresh={fetchData} 
+                        />
                     )
                 ))}
             </MapContainer>

@@ -15,7 +15,7 @@ export default function Home() {
   useEffect(() => {
     const startServer = async () => {
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}`, {
           method: 'GET',
         });
       } catch (err) {

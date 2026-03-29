@@ -11,6 +11,7 @@ interface LocationSelectProps {
     onSelectSearchedLocation: (lat: number, lng: number) => void;
     pickedLocation?: { lat: number; lng: number } | null;
     onPinSuccess?: () => void;
+    onRemoveLocation?: () => void;
 }
 
 interface PhotonFeature {
@@ -29,7 +30,7 @@ interface PhotonFeature {
     };
 }
 
-export default function LocationSelect({ isOpen, onClose, onSelectLocationMode, onSelectSearchedLocation, pickedLocation, onPinSuccess }: LocationSelectProps) {
+export default function LocationSelect({ isOpen, onClose, onSelectLocationMode, onSelectSearchedLocation, pickedLocation, onPinSuccess, onRemoveLocation }: LocationSelectProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedType, setSelectedType] = useState<string>('');
@@ -40,7 +41,10 @@ export default function LocationSelect({ isOpen, onClose, onSelectLocationMode, 
 
     // Reverse geocode picked location to get actual place name
     useEffect(() => {
-        if (!pickedLocation) return;
+        if (!pickedLocation) {
+            setPickedLocationName('');
+            return;
+        }
 
         const fetchLocationName = async () => {
             try {
@@ -128,10 +132,22 @@ export default function LocationSelect({ isOpen, onClose, onSelectLocationMode, 
                     <div className="bg-blue-100 p-2 rounded-full shrink-0">
                         <MapPin className="w-5 h-5 text-blue-600" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                         <div className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-0.5">Selected Location</div>
                         <div className="text-sm font-semibold text-gray-800 line-clamp-1">{pickedLocationName}</div>
                     </div>
+                    {onRemoveLocation && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRemoveLocation();
+                            }}
+                            className="p-1 hover:bg-blue-100 rounded-full transition-colors"
+                            title="Remove Location"
+                        >
+                            <X className="w-5 h-5 text-blue-600" />
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -303,6 +319,14 @@ export default function LocationSelect({ isOpen, onClose, onSelectLocationMode, 
                                 if (response.ok) {
                                     const toast = (await import('react-toastify')).toast;
                                     toast.success("Location pinned successfully!");
+                                    
+                                    // Clear local state
+                                    setSelectedType('');
+                                    setPinDuration('');
+                                    setPickedLocationName('');
+                                    setSearchResults([]);
+                                    setSearchQuery('');
+                                    
                                     if (onPinSuccess) onPinSuccess();
                                     setIsDialogOpen(false);
                                     onClose();

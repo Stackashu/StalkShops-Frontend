@@ -14,6 +14,12 @@ export default function TopBar({ onMenuClick, onOpenSidebar, onOpenSearch, onLog
     // Handle both vendor and user prop names
     const handleMenuClick = onOpenSidebar || onMenuClick;
 
+    const formatDisplayName = (name?: string) => {
+        if (!name) return '';
+        const firstName = name.trim().split(' ')[0];
+        return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+    };
+
     return (
         <div className="flex items-center gap-3 w-full">
             {/* Profile Icon */}
@@ -32,7 +38,7 @@ export default function TopBar({ onMenuClick, onOpenSidebar, onOpenSearch, onLog
             ) : (
                 <div className="flex-1 h-12 bg-white rounded-full shadow-lg flex items-center px-5 text-gray-500 transition-colors border border-gray-100 overflow-hidden">
                     <span className="text-sm truncate">
-                        {userName ? `Hi, ${userName}` : 'Search Samosa , chai ....'}
+                        {userName ? `Hi, ${formatDisplayName(userName)}` : 'Search Samosa , chai ....'}
                     </span>
                 </div>
             )}
